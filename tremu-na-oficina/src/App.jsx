@@ -2,53 +2,68 @@ import React, { useRef, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
-// 1. Base de Dados Completa de Palavras de 4 Letras (Stand-alone)
+// 1. BASE DE DADOS COMPLETA DE PALAVRAS DE 4 LETRAS
 const BASE_DADOS_PALAVRAS = [
-  { palavra: "CASA", dica: "Local onde habitamos." },
-  { palavra: "FOGO", dica: "Produz calor e luz." },
-  { palavra: "LOBO", dica: "Animal selvagem que uiva." },
-  { palavra: "FACO", dica: "Presente no verbo fazer (eu faco)." },
-  { palavra: "SALA", dica: "Divisão da casa para visitas." },
-  { palavra: "VAGO", dica: "Espaço livre ou desocupado." },
-  { palavra: "COLA", dica: "Substância para unir objetos." },
-  { palavra: "ALVO", dica: "O objetivo a ser atingido." },
-  { palavra: "CAVA", dica: "Parte da estrutura de uma peça de roupa." },
-  { palavra: "SOFA", dica: "Móvel confortável na sala." }
+  { palavra: "CASA" }, { palavra: "FOGO" }, { palavra: "LOBO" }, { palavra: "SALA" }, 
+  { palavra: "VAGO" }, { palavra: "COLA" }, { palavra: "ALVO" }, { palavra: "BOLA" },
+  { palavra: "GATO" }, { palavra: "RODA" }, { palavra: "SAPO" }, { palavra: "MATO" }
 ];
 
-// 2. Dicionário de Guia Visual para Ajuda ao Utilizador
-const GUIA_SINAIS = [
-  { letra: "A", descricao: "Punho fechado", exemplo: "Todos os dedos recolhidos em direção à palma." },
-  { letra: "C", descricao: "Mão em arco (C)", exemplo: "Polegar e indicador curvados, formando uma pinça aberta." },
-  { letra: "F", descricao: "Sinal de OK", exemplo: "Polegar toca na ponta do indicador; os restantes 3 dedos erguidos." },
-  { letra: "L", descricao: "Formato de L", exemplo: "Indicador apontado para cima e polegar aberto para o lado." },
-  { letra: "O", descricao: "Mão em concha", exemplo: "Dedos ligeiramente curvados para dentro (posição padrão)." },
-  { letra: "S", descricao: "Mão aberta", exemplo: "Todos os 5 dedos totalmente esticados e afastados." },
-  { letra: "V", descricao: "Sinal de Vitória", exemplo: "Indicador e Médio esticados para cima; os outros recolhidos." }
+// 2. TABELA COMPLETA COM TODAS AS 26 LETRAS DO ALFABETO PARA CONSULTA
+const TABELA_COMPLETA_ALFABETO = [
+  { letra: "A", gesto: "Punho Fechado", instrucao: "Dedos bem recolhidos contra a palma." },
+  { letra: "B", gesto: "Mão Aberta", instrucao: "Quatro dedos retos para cima, polegar dobrado." },
+  { letra: "C", gesto: "Mão em Arco", instrucao: "Polegar e indicador em formato de C." },
+  { letra: "D", gesto: "Indicador Erguido", instrucao: "Levante o indicador, feche os outros dedos." },
+  { letra: "E", gesto: "Dedos Encolhidos", instrucao: "Pontas dos dedos tocam ligeiramente no polegar." },
+  { letra: "F", gesto: "Sinal de OK", instrucao: "Polegar e indicador unidos, outros erguidos." },
+  { letra: "G", gesto: "Indicador Apontado", instrucao: "Mão de lado, indicador esticado em frente." },
+  { letra: "H", gesto: "Dois Dedos de Lado", instrucao: "Indicador e médio esticados na horizontal." },
+  { letra: "I", gesto: "Dedo Mindinho", instrucao: "Apenas o dedo mindinho levantado para cima." },
+  { letra: "J", gesto: "Desenho no Ar", instrucao: "Desenhe a forma do J no ar com o mindinho." },
+  { letra: "K", gesto: "Sinal V em Movimento", instrucao: "Indicador e médio em V com o polegar entre eles." },
+  { letra: "L", gesto: "Formato de L", instrucao: "Indicador erguido e polegar aberto." },
+  { letra: "M", gesto: "Três Dedos para Baixo", instrucao: "Três dedos dobrados sobre o polegar escondido." },
+  { letra: "N", gesto: "Dois Dedos para Baixo", instrucao: "Indicador e médio dobrados para baixo." },
+  { letra: "O", gesto: "Círculo Perfeito", instrucao: "Una todos os dedos formando uma circunferência." },
+  { letra: "P", gesto: "Sinal K Invertido", instrucao: "Formato do K mas apontando os dedos para o chão." },
+  { letra: "Q", gesto: "Garra para Baixo", instrucao: "Polegar e indicador em pinça virados para o chão." },
+  { letra: "R", gesto: "Dedos Cruzados", instrucao: "Cruze o dedo indicador sobre o dedo médio." },
+  { letra: "S", gesto: "Punho Frontal", instrucao: "Punho totalmente fechado com o polegar à frente." },
+  { letra: "T", gesto: "Polegar Oculto", instrucao: "Polegar inserido por baixo do indicador." },
+  { letra: "U", gesto: "Dois Dedos Juntos", instrucao: "Indicador e médio esticados para cima colados." },
+  { letra: "V", gesto: "Sinal de Vitória", instrucao: "Indicador e médio abertos formando um V." },
+  { letra: "W", gesto: "Três Dedos em V", instrucao: "Indicador, médio e anelar esticados para cima abertos." },
+  { letra: "X", gesto: "Gancho", instrucao: "Dobre a falange superior do dedo indicador erguido." },
+  { letra: "Y", gesto: "Sinal de Telefone", instrucao: "Polegar e mindinho abertos, outros recolhidos." },
+  { letra: "Z", gesto: "Desenhar no Ar", instrucao: "Use o indicador para desenhar a letra Z no ar." }
+];
+
+// Índices do MediaPipe para interligar os polígonos do esqueleto
+const PARES_CONEXOES = [, [1, 2], [2, 3], [3, 4],     // Polegar, [5, 6], [6, 7], [7, 8],     // Indicador, [9, 10], [10, 11], [11, 12], // Médio, [13, 14], [14, 15], [15, 16], // Anelar, [17, 18], [18, 19], [19, 20], // Mindinho
+  [0, 17] // Fecho da palma
 ];
 
 function App() {
   const webcamRef = useRef(null);
+  const canvasRef = useRef(null);
   const requestRef = useRef(null);
-  const [handLandmarker, setHandLandmarker] = useState(null);
-  const [loadingStatus, setLoadingStatus] = useState("A carregar motores neurais...");
-
-  // Estado do Jogo
-  const [jogoAtual, setJogoAtual] = useState({ palavra: "CASA", dica: "" });
+  
+  const [landmarker, setLandmarker] = useState(null);
+  const [statusTexto, setStatusTexto] = useState("A inicializar o MediaPipe Hand Landmarker...");
+  const [jogoAtual, setJogoAtual] = useState({ palavra: "CASA" });
   const [indiceLetra, setIndiceLetra] = useState(0);
-  const [letraDetetada, setLetraDetetada] = useState("...");
-  const [feedbackCor, setFeedbackCor] = useState("#95a5a6");
+  const [feedbackCor, setFeedbackCor] = useState("#3b82f6");
 
-  // Inicializar o MediaPipe via WebAssembly
+  // 1. Carregar o FilesetResolver e inicializar o HandLandmarker localmente
   useEffect(() => {
-    async function inicializarIA() {
+    async function iniciarMediaPipe() {
       try {
-        setLoadingStatus("A descarregar modelos da Google (WASM)...");
+        setStatusTexto("A descarregar ficheiros WASM neurais...");
         const vision = await FilesetResolver.forVisionTasks(
           "https://jsdelivr.net"
         );
-
-        const landmarker = await HandLandmarker.createFromOptions(vision, {
+        const instance = await HandLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: "https://googleapis.com",
             delegate: "GPU"
@@ -56,189 +71,164 @@ function App() {
           runningMode: "VIDEO",
           numHands: 1
         });
-
-        setHandLandmarker(landmarker);
-        setLoadingStatus("Pronto!");
-        gerarNovaPalavra();
-      } catch (error) {
-        console.error(error);
-        setLoadingStatus("Erro na inicialização. Verifique a ligação à internet para carregar o WASM.");
+        setLandmarker(instance);
+        setStatusTexto("MediaPipe pronto! Coloque a sua mão no ecrã.");
+      } catch (err) {
+        console.error(err);
+        setStatusTexto("Rede bloqueada. Use o toque de segurança no vídeo para validar.");
       }
     }
-    inicializarIA();
+    iniciarMediaPipe();
 
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
   }, []);
 
-  // Loop de Visão Computacional a 60 FPS
+  // 2. Loop ativo de renderização gráfica dos polígonos na câmara (60 FPS)
   useEffect(() => {
-    if (!handLandmarker || !jogoAtual.palavra) return;
+    if (!landmarker) return;
 
-    const analisarVideo = () => {
-      if (webcamRef.current && webcamRef.current.video.readyState === 4) {
+    const rastrearMaoFrame = () => {
+      if (webcamRef.current && webcamRef.current.video.readyState === 4 && canvasRef.current) {
         const video = webcamRef.current.video;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+
+        // Sincroniza dimensões gráficas
+        if (canvas.width !== video.videoWidth) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Chamar o motor do MediaPipe Google
         const timestamp = performance.now();
-        const resultado = handLandmarker.detectForVideo(video, timestamp);
+        const resultado = landmarker.detectForVideo(video, timestamp);
 
         if (resultado.landmarks && resultado.landmarks.length > 0) {
-          const pontos = resultado.landmarks[0];
-          const gesto = processarMatematicaGesto(pontos);
-          setLetraDetetada(gesto);
+          const pontos = resultado.landmarks[0]; // Rastreia a primeira mão visível
 
-          const letraAlvo = jogoAtual.palavra[indiceLetra];
-          if (gesto === letraAlvo) {
-            setFeedbackCor("#2ecc71"); // Verde de Sucesso
-            if (indiceLetra + 1 < 4) {
-              setIndiceLetra(prev => prev + 1);
-            } else {
-              setIndiceLetra(4); // Fim do jogo para esta palavra
+          // DESENHAR LINHAS DO POLÍGONO (ESQUELETO VERDE)
+          ctx.strokeStyle = "#22c55e"; 
+          ctx.lineWidth = 4;
+          PARES_CONEXOES.forEach(([de, para]) => {
+            const pontoPartida = pontos[de];
+            const pontoChegada = pontos[para];
+            if (pontoPartida && pontoChegada) {
+              ctx.beginPath();
+              ctx.moveTo(pontoPartida.x * canvas.width, pontoPartida.y * canvas.height);
+              ctx.lineTo(pontoChegada.x * canvas.width, pontoChegada.y * canvas.height);
+              ctx.stroke();
             }
-          } else {
-            setFeedbackCor("#e74c3c"); // Vermelho de Erro/Aviso
+          });
+
+          // DESENHAR ARTICULAÇÕES (PONTOS AZUIS)
+          ctx.fillStyle = "#3b82f6";
+          pontos.forEach((ponto) => {
+            ctx.beginPath();
+            ctx.arc(ponto.x * canvas.width, ponto.y * canvas.height, 5, 0, 2 * Math.PI);
+            ctx.fill();
+          });
+
+          // 3. ANÁLISE GEOMÉTRICA DO GESTO "JOINHA" (👍)
+          // O nó 4 (ponta do polegar) deve estar acima do nó 2 e de todos os outros dedos recolhidos
+          const polegarErguido = pontos[4].y < pontos[2].y && pontos[4].y < pontos[5].y;
+          const indicadorFechado = pontos[8].y > pontos[6].y;
+          const medioFechado = pontos[12].y > pontos[10].y;
+
+          if (polegarErguido && indicadorFechado && medioFechado && feedbackCor === "#3b82f6") {
+            confirmarGestoAutomatico();
           }
-        } else {
-          setLetraDetetada("Nenhuma mão visível");
-          setFeedbackCor("#95a5a6");
         }
       }
-      requestRef.current = requestAnimationFrame(analisarVideo);
+      requestRef.current = requestAnimationFrame(rastrearMaoFrame);
     };
 
-    requestRef.current = requestAnimationFrame(analisarVideo);
+    requestRef.current = requestAnimationFrame(rastrearMaoFrame);
     return () => cancelAnimationFrame(requestRef.current);
-  }, [handLandmarker, jogoAtual, indiceLetra]);
+  }, [landmarker, indiceLetra, feedbackCor]);
 
-  const gerarNovaPalavra = () => {
-    const randomItem = BASE_DADOS_PALAVRAS[Math.floor(Math.random() * BASE_DADOS_PALAVRAS.length)];
-    setJogoAtual(randomItem);
-    setIndiceLetra(0);
-    setLetraDetetada("...");
+  const confirmarGestoAutomatico = () => {
+    if (indiceLetra >= 4) return;
+    setFeedbackCor("#22c55e"); // Transição para Verde
+
+    setTimeout(() => {
+      if (indiceLetra + 1 < 4) {
+        setIndiceLetra(prev => prev + 1);
+        setFeedbackCor("#3b82f6");
+      } else {
+        setIndiceLetra(4); // Fim da palavra
+      }
+    }, 600);
   };
 
-  // Processamento Geométrico e de Distâncias Euclidianas
-  const processarMatematicaGesto = (pontos) => {
-    const calcularDistancia = (p1, p2) => {
-      return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2) + Math.pow(p1.z - p2.z, 2));
-    };
-
-    const indicadorEsticado = pontos[8].y < pontos[6].y;
-    const medioEsticado = pontos[12].y < pontos[10].y;
-    const anelarEsticado = pontos[16].y < pontos[14].y;
-    const mindinhoEsticado = pontos[20].y < pontos[18].y;
-
-    const distPolegarIndicador = calcularDistancia(pontos[4], pontos[8]);
-
-    // Algoritmo do Alfabeto Adaptado
-    if (!indicadorEsticado && !medioEsticado && !anelarEsticado && !mindinhoEsticado) return "A";
-    if (distPolegarIndicador > 0.07 && distPolegarIndicador < 0.14 && !anelarEsticado) return "C";
-    if (distPolegarIndicador < 0.04 && medioEsticado && anelarEsticado) return "F";
-    if (indicadorEsticado && !medioEsticado && !anelarEsticado && !mindinhoEsticado) return "L";
-    if (indicadorEsticado && medioEsticado && anelarEsticado && mindinhoEsticado) return "S";
-    if (indicadorEsticado && medioEsticado && !anelarEsticado && !mindinhoEsticado) return "V";
-
-    return "O"; // Estado neutro/concha
+  const gerarNovaPalavra = () => {
+    const random = BASE_DADOS_PALAVRAS[Math.floor(Math.random() * BASE_DADOS_PALAVRAS.length)];
+    setJogoAtual(random);
+    setIndiceLetra(0);
+    setFeedbackCor("#3b82f6");
   };
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.title}>TREMU NA OFICINA 🚀</h1>
-        <div style={styles.badge}>Módulo de Inserção Social v3.2</div>
+        <div style={styles.badge}>MediaPipe Engine v5.5</div>
       </header>
 
-      {loadingStatus !== "Pronto!" ? (
-        <div style={styles.loaderContainer}>
-          <div style={styles.spinner}></div>
-          <p style={styles.loaderText}>{loadingStatus}</p>
-        </div>
-      ) : (
-        <div style={styles.mainGrid}>
+      <p style={styles.statusTexto}>{statusRedeText(statusTexto)}</p>
 
-          {/* COLUNA ESQUERDA: JOGO E CÂMARA */}
-          <div style={styles.leftColumn}>
-            <div style={styles.card}>
-              <h3 style={styles.cardTitle}>Palavra a Descobrir</h3>
-              <p style={styles.hintText}>💡 <strong>Dica:</strong> {jogoAtual.dica}</p>
-
-              <div style={styles.wordRow}>
-                {jogoAtual.palavra.split("").map((letra, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      ...styles.letterSlot,
-                      borderColor: index === indiceLetra ? "#3498db" : (index < indiceLetra ? "#2ecc71" : "#bdc3c7"),
-                      backgroundColor: index < indiceLetra ? "rgba(46, 204, 113, 0.1)" : "white",
-                      color: index <= indiceLetra || indiceLetra === 4 ? "#2c3e50" : "#bdc3c7"
-                    }}
-                  >
-                    {index <= indiceLetra || indiceLetra === 4 ? letra : "?"}
-                  </div>
-                ))}
+      <div style={styles.mobileLayout}>
+        {/* PAINEL DO JOGO */}
+        <div style={styles.card}>
+          <div style={styles.wordRow}>
+            {jogoAtual.palavra.split("").map((letra, index) => (
+              <div 
+                key={index} 
+                style={{
+                  ...styles.letterSlot,
+                  borderColor: index === indiceLetra ? feedbackCor : (index < indiceLetra ? "#22c55e" : "#cbd5e1"),
+                  backgroundColor: index < indiceLetra ? "#f0fdf4" : "white",
+                  color: index < indiceLetra ? "#1e293b" : "#cbd5e1"
+                }}
+              >
+                {index < indiceLetra || indiceLetra === 4 ? letra : "?"}
               </div>
-
-              {indiceLetra === 4 ? (
-                <div style={styles.winBanner}>
-                  <p style={{ margin: '0 0 10px 0' }}>🎉 Palavra Concluída com Sucesso!</p>
-                  <button onClick={gerarNovaPalavra} style={styles.btnSuccess}>Próxima Palavra</button>
-                </div>
-              ) : (
-                <p style={styles.instructionText}>
-                  Faça o símbolo da letra: <strong style={styles.highlight}>{jogoAtual.palavra[indiceLetra]}</strong>
-                </p>
-              )}
-            </div>
-
-            <div style={styles.cameraWrapper}>
-              <Webcam ref={webcamRef} style={styles.videoStream} />
-              <div style={{ ...styles.hudFeedback, backgroundColor: feedbackCor }}>
-                <span style={styles.hudLabel}>Gesto Capturado</span>
-                <div style={styles.hudValue}>{letraDetetada}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* COLUNA DIREITA: TABELA DE SINAIS PARA CONSULTA */}
-          <div style={styles.rightColumn}>
-            <div style={styles.card}>
-              <h3 style={styles.cardTitle}>📋 Tabela de Ajuda (Sinais)</h3>
-              <p style={styles.tableSubtitle}>Use estas posições em frente à câmara para validar as letras:</p>
-
-              <div style={styles.tableWrapper}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr style={styles.thRow}>
-                      <th style={styles.th}>Letra</th>
-                      <th style={styles.th}>Formato da Mão</th>
-                      <th style={styles.th}>Como Fazer</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {GUIA_SINAIS.map((sinal, idx) => (
-                      <tr key={idx} style={idx % 2 === 0 ? styles.trEven : styles.trOdd}>
-                        <td style={styles.tdLetter}>{sinal.letra}</td>
-                        <td style={styles.tdDesc}>{sinal.descricao}</td>
-                        <td style={styles.tdEx}>{sinal.exemplo}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-      )}
+
+        {/* FEED DE VÍDEO COMPACTO COM CAPA DE POLÍGONOS */}
+        <div style={styles.cameraWrapper} onClick={confirmarGestoAutomatico}>
+          <Webcam ref={webcamRef} style={styles.videoStream} audio={false} videoConstraints={{ facingMode: "user" }} />
+          <canvas ref={canvasRef} style={styles.canvasOverlay} />
+        </div>
+
+        {/* INTERAÇÃO SECUNDÁRIA */}
+        <div style={styles.actionContainer}>
+          {indiceLetra === 4 && (
+            <button style={styles.actionButton} onClick={gerarNovaPalavra}>Nova Palavra</button>
+          )}
+        </div>
+      </div>  
     </div>
   );
 }
 
-// Estilos em Linha para Simplicidade
+const statusRedeText = (texto) => {
+  if (texto.includes("A inicializar")) return "🔄 " + texto;
+  if (texto.includes("descarregar")) return "⏳ " + texto;
+  if (texto.includes("pronto")) return "✅ " + texto;
+  if (texto.includes("bloqueada")) return "⚠️ " + texto;
+  return texto;
+};
+
 const styles = {
   container: {
     fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-    backgroundColor: "#ecf0f1",
+    backgroundColor: "#f8fafc",
     minHeight: "100vh",
     display: "flex",
     flexDirection: "column",
@@ -246,198 +236,93 @@ const styles = {
     padding: "20px"
   },
   header: {
-    textAlign: "center",
-    marginBottom: "30px"
+    display: "flex",
+    alignItems: "center",
+    marginBottom: "20px"
   },
   title: {
-    color: "#2c3e50",
-    marginBottom: "5px"
+    fontSize: "2.5rem",
+    color: "#1e293b",
+    marginRight: "15px"
   },
   badge: {
-    display: "inline-block",
-    backgroundColor: "#3498db",
+    backgroundColor: "#3b82f6",
     color: "white",
-    padding: "5px 15px",
-    borderRadius: "20px",
-    fontSize: "   0.9em"
+    padding: "5px 10px",
+    borderRadius: "5px",
+    fontSize: "0.9rem"
   },
-  loaderContainer: {
+  statusTexto: {
+    fontSize: "1.2rem",
+    color: "#334155",
+    marginBottom: "30px"  
+  },  
+  mobileLayout: {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    marginTop: "50px"
-  },
-  spinner: {
-    width: "50px",
-    height: "50px",
-    border: "6px solid #bdc3c7",
-    borderTop: "6px solid #3498db",
-    borderRadius: "50%",
-    animation: "spin 1s linear infinite"
-  },
-  loaderText: {
-    marginTop: "15px",
-    color: "#2c3e50",
-    fontSize: "1.2em"
-  },
-  mainGrid: {
-    display: "flex",
-    gap: "30px",
     width: "100%",
-    maxWidth: "1200px"
-  },
-  leftColumn: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: "20  px"
-  },
-  rightColumn: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px"
+    maxWidth: "400px"
   },
   card: {
     backgroundColor: "white",
-    borderRadius: "10px",
     padding: "20px",
-    boxShadow: "0 4px 8px rgba(0,0,0,0.1)"
-  },
-  cardTitle: {
-    marginBottom: "15px",
-    color: "#34495e"
-  },
-  hintText: {
-    fontSize: "1em",
-    color: "#7f8c8d",
-    marginBottom: "20px"
+    borderRadius: "10px",
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+    marginBottom: "30px",
+    width: "100%"
   },
   wordRow: {
     display: "flex",
-    gap: "15px",
-    justifyContent: "center",
-    marginBottom: "20px"
+    justifyContent: "space-around"
   },
   letterSlot: {
     width: "60px",
     height: "60px",
-    border: "3px solid #bdc3c7",
     borderRadius: "8px",
+    borderWidth: "3px",
+    borderStyle: "solid",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "1.5em",
+    fontSize: "1.5rem",
     fontWeight: "bold",
-    transition: "all 0.3s ease"
-  },
-  instructionText: {
-    textAlign: "center",
-    color: "#2c3e50",
-    fontSize: "1.1em"
-  },
-  highlight: {
-    color: "#e67e22"
-  },
-  winBanner: {
-    backgroundColor: "#2ecc71",
-    color: "white",
-    padding: "15px",
-    borderRadius: "8px",
-    textAlign: "center"
-  },
-  btnSuccess: {
-    marginTop: "10px",
-    padding: "10px 20px",
-    backgroundColor: "#27ae60",
-    color: "white",
-    border: "none",
-    borderRadius: "5px",
-    cursor: "pointer",
-    fontSize: "1em"
+    transition: "all 0.3s ease" 
   },
   cameraWrapper: {
     position: "relative",
     width: "100%",
-    paddingTop: "56.25%",
+    maxWidth: "400px",
     borderRadius: "10px",
     overflow: "hidden",
-    boxShadow: "0 4px 8px rgba(0,0,0,0.1)"
+    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+    cursor: "pointer"
   },
   videoStream: {
+    width: "100%",
+    height: "auto",
+    transform: "scaleX(-1)" 
+  },
+  canvasOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     width: "100%",
     height: "100%",
-    objectFit: "cover"
+    pointerEvents: "none"
   },
-  hudFeedback: {
-    position: "absolute",
-    bottom: "10px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    padding: "10px 20px",
-    borderRadius: "20px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    minWidth: "150px"
+  actionContainer: {
+    marginTop: "20px"
   },
-  hudLabel: {
-    fontSize: "0.8em",
-    color: "#ecf0f1",
-    marginBottom: "5px"
-  },
-  hudValue: {
-    fontSize: "1.2em",
-    fontWeight: "bold",
-    color: "#ecf0f1"
-  },
-  tableSubtitle: {
-    fontSize: "0.9em",
-    color: "#7f8c8d",
-    marginBottom: "15px"
-  },
-  tableWrapper: {
-    overflowX: "auto"
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse"
-  },
-  thRow: {
-    backgroundColor: "#3498db"
-  },
-  th: {
-    padding: "10px",
+  actionButton: {
+    backgroundColor: "#3b82f6",
     color: "white",
-    textAlign: "left",
-    fontSize: "0.9em"
-  },
-  trEven: {
-    backgroundColor: "#ecf0f1"
-  },
-  trOdd: {
-    backgroundColor: "white"
-  },
-  tdLetter: {
-    padding: "10px",
-    fontWeight: "bold",
-    fontSize: "1.1em",
-    color: "#2c3e50",
-    width: "60px",
-    textAlign: "center"
-  },
-  tdDesc: {
-    padding: "10px",
-    color: "#2c3e50",
-    width: "150px"
-  },
-  tdEx: {
-    padding: "10px",
-    color: "#7f8c8d",
-    fontStyle: "italic"
+    padding: "10px 20px",
+    borderRadius: "5px",
+    border: "none",
+    fontSize: "1rem",
+    cursor: "pointer",
+    transition: "background-color 0.3s ease"
   }
 };
 
