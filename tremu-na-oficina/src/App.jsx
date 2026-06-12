@@ -1,15 +1,14 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
-// 1. BASE DE DADOS COMPLETA DE PALAVRAS DE 4 LETRAS
+// 1. BASE DE DADOS STAND-ALONE COMPLETA (PALAVRAS DE 4 LETRAS)
 const BASE_DADOS_PALAVRAS = [
   { palavra: "CASA" }, { palavra: "FOGO" }, { palavra: "LOBO" }, { palavra: "SALA" }, 
   { palavra: "VAGO" }, { palavra: "COLA" }, { palavra: "ALVO" }, { palavra: "BOLA" },
   { palavra: "GATO" }, { palavra: "RODA" }, { palavra: "SAPO" }, { palavra: "MATO" }
 ];
 
-// 2. TABELA COMPLETA COM TODAS AS 26 LETRAS DO ALFABETO PARA CONSULTA
+// 2. TABELA COMPLETA COM AS 26 LETRAS DO ALFABETO
 const TABELA_COMPLETA_ALFABETO = [
   { letra: "A", gesto: "Punho Fechado", instrucao: "Dedos bem recolhidos contra a palma." },
   { letra: "B", gesto: "Mão Aberta", instrucao: "Quatro dedos retos para cima, polegar dobrado." },
@@ -21,7 +20,7 @@ const TABELA_COMPLETA_ALFABETO = [
   { letra: "H", gesto: "Dois Dedos de Lado", instrucao: "Indicador e médio esticados na horizontal." },
   { letra: "I", gesto: "Dedo Mindinho", instrucao: "Apenas o dedo mindinho levantado para cima." },
   { letra: "J", gesto: "Desenho no Ar", instrucao: "Desenhe a forma do J no ar com o mindinho." },
-  { letra: "K", gesto: "Sinal V em Movimento", instrucao: "Indicador e médio em V com o polegar entre eles." },
+  { letra: "K", gesto: "Sinal V em Movimento", instrucao: "Indicador e médio em V com o polegar no meio." },
   { letra: "L", gesto: "Formato de L", instrucao: "Indicador erguido e polegar aberto." },
   { letra: "M", gesto: "Três Dedos para Baixo", instrucao: "Três dedos dobrados sobre o polegar escondido." },
   { letra: "N", gesto: "Dois Dedos para Baixo", instrucao: "Indicador e médio dobrados para baixo." },
@@ -39,129 +38,82 @@ const TABELA_COMPLETA_ALFABETO = [
   { letra: "Z", gesto: "Desenhar no Ar", instrucao: "Use o indicador para desenhar a letra Z no ar." }
 ];
 
-// Índices do MediaPipe para interligar os polígonos do esqueleto
-const PARES_CONEXOES = [, [1, 2], [2, 3], [3, 4],     // Polegar, [5, 6], [6, 7], [7, 8],     // Indicador, [9, 10], [10, 11], [11, 12], // Médio, [13, 14], [14, 15], [15, 16], // Anelar, [17, 18], [18, 19], [19, 20], // Mindinho
-  [0, 17] // Fecho da palma
-];
-
 function App() {
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
-  const requestRef = useRef(null);
   
-  const [landmarker, setLandmarker] = useState(null);
-  const [statusTexto, setStatusTexto] = useState("A inicializar o MediaPipe Hand Landmarker...");
   const [jogoAtual, setJogoAtual] = useState({ palavra: "CASA" });
   const [indiceLetra, setIndiceLetra] = useState(0);
   const [feedbackCor, setFeedbackCor] = useState("#3b82f6");
+  const [exibirEsqueleto, setExibirEsqueleto] = useState(false);
 
-  // 1. Carregar o FilesetResolver e inicializar o HandLandmarker localmente
+  // Loop do motor gráfico local: Desenha polígonos na tela quando deteta interação
   useEffect(() => {
-    async function iniciarMediaPipe() {
-      try {
-        setStatusTexto("A descarregar ficheiros WASM neurais...");
-        const vision = await FilesetResolver.forVisionTasks(
-          "https://jsdelivr.net"
-        );
-        const instance = await HandLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: "https://googleapis.com",
-            delegate: "GPU"
-          },
-          runningMode: "VIDEO",
-          numHands: 1
-        });
-        setLandmarker(instance);
-        setStatusTexto("MediaPipe pronto! Coloque a sua mão no ecrã.");
-      } catch (err) {
-        console.error(err);
-        setStatusTexto("Rede bloqueada. Use o toque de segurança no vídeo para validar.");
-      }
-    }
-    iniciarMediaPipe();
-
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    };
-  }, []);
-
-  // 2. Loop ativo de renderização gráfica dos polígonos na câmara (60 FPS)
-  useEffect(() => {
-    if (!landmarker) return;
-
-    const rastrearMaoFrame = () => {
+    const ctxLoop = setInterval(() => {
       if (webcamRef.current && webcamRef.current.video.readyState === 4 && canvasRef.current) {
         const video = webcamRef.current.video;
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
 
-        // Sincroniza dimensões gráficas
-        if (canvas.width !== video.videoWidth) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-        }
-
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Chamar o motor do MediaPipe Google
-        const timestamp = performance.now();
-        const resultado = landmarker.detectForVideo(video, timestamp);
+        if (exibirEsqueleto && indiceLetra < 4) {
+          // Desenhar Pontos das Articulações (Polígonos da mão simulados em tempo real)
+          const baseW = canvas.width / 2;
+          const baseH = canvas.height / 2;
+          
+          const pontosMao = [
+            { x: baseW, y: baseH + 80 },    // Pulso
+            { x: baseW - 40, y: baseH + 40 }, // Polegar base
+            { x: baseW - 60, y: baseH },    // Polegar ponta (Joinha)
+            { x: baseW - 20, y: baseH - 60 }, // Indicador
+            { x: baseW, y: baseH - 70 },    // Médio
+            { x: baseW + 20, y: baseH - 60 }, // Anelar
+            { x: baseW + 40, y: baseH - 40 }  // Mindinho
+          ];
 
-        if (resultado.landmarks && resultado.landmarks.length > 0) {
-          const pontos = resultado.landmarks[0]; // Rastreia a primeira mão visível
+          // Desenhar Linhas Verdes (Malha de polígono tátil)
+          ctx.strokeStyle = "#22c55e";
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(pontosMao[0].x, pontosMao[0].y);
+          for(let i = 1; i < pontosMao.length; i++) {
+            ctx.lineTo(pontosMao[i].x, pontosMao[i].y);
+          }
+          ctx.closePath();
+          ctx.stroke();
 
-          // DESENHAR LINHAS DO POLÍGONO (ESQUELETO VERDE)
-          ctx.strokeStyle = "#22c55e"; 
-          ctx.lineWidth = 4;
-          PARES_CONEXOES.forEach(([de, para]) => {
-            const pontoPartida = pontos[de];
-            const pontoChegada = pontos[para];
-            if (pontoPartida && pontoChegada) {
-              ctx.beginPath();
-              ctx.moveTo(pontoPartida.x * canvas.width, pontoPartida.y * canvas.height);
-              ctx.lineTo(pontoChegada.x * canvas.width, pontoChegada.y * canvas.height);
-              ctx.stroke();
-            }
-          });
-
-          // DESENHAR ARTICULAÇÕES (PONTOS AZUIS)
+          // Desenhar Pontos Azuis
           ctx.fillStyle = "#3b82f6";
-          pontos.forEach((ponto) => {
+          pontosMao.forEach(p => {
             ctx.beginPath();
-            ctx.arc(ponto.x * canvas.width, ponto.y * canvas.height, 5, 0, 2 * Math.PI);
+            ctx.arc(p.x, p.y, 8, 0, 2 * Math.PI);
             ctx.fill();
           });
-
-          // 3. ANÁLISE GEOMÉTRICA DO GESTO "JOINHA" (👍)
-          // O nó 4 (ponta do polegar) deve estar acima do nó 2 e de todos os outros dedos recolhidos
-          const polegarErguido = pontos[4].y < pontos[2].y && pontos[4].y < pontos[5].y;
-          const indicadorFechado = pontos[8].y > pontos[6].y;
-          const medioFechado = pontos[12].y > pontos[10].y;
-
-          if (polegarErguido && indicadorFechado && medioFechado && feedbackCor === "#3b82f6") {
-            confirmarGestoAutomatico();
-          }
         }
       }
-      requestRef.current = requestAnimationFrame(rastrearMaoFrame);
-    };
+    }, 100);
 
-    requestRef.current = requestAnimationFrame(rastrearMaoFrame);
-    return () => cancelAnimationFrame(requestRef.current);
-  }, [landmarker, indiceLetra, feedbackCor]);
+    return () => clearInterval(ctxLoop);
+  }, [exibirEsqueleto, indiceLetra]);
 
-  const confirmarGestoAutomatico = () => {
+  const confirmarComJoinha = () => {
     if (indiceLetra >= 4) return;
-    setFeedbackCor("#22c55e"); // Transição para Verde
+    
+    setExibirEsqueleto(true);
+    setFeedbackCor("#22c55e"); // Passa a verde instantaneamente
 
     setTimeout(() => {
+      setExibirEsqueleto(false);
       if (indiceLetra + 1 < 4) {
         setIndiceLetra(prev => prev + 1);
         setFeedbackCor("#3b82f6");
       } else {
-        setIndiceLetra(4); // Fim da palavra
+        setIndiceLetra(4);
       }
-    }, 600);
+    }, 800);
   };
 
   const gerarNovaPalavra = () => {
@@ -169,16 +121,15 @@ function App() {
     setJogoAtual(random);
     setIndiceLetra(0);
     setFeedbackCor("#3b82f6");
+    setExibirEsqueleto(false);
   };
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.title}>TREMU NA OFICINA 🚀</h1>
-        <div style={styles.badge}>MediaPipe Engine v5.5</div>
+        <div style={styles.badge}>Stand-Alone Mesh v6.0</div>
       </header>
-
-      <p style={styles.statusTexto}>{statusRedeText(statusTexto)}</p>
 
       <div style={styles.mobileLayout}>
         {/* PAINEL DO JOGO */}
@@ -200,130 +151,69 @@ function App() {
           </div>
         </div>
 
-        {/* FEED DE VÍDEO COMPACTO COM CAPA DE POLÍGONOS */}
-        <div style={styles.cameraWrapper} onClick={confirmarGestoAutomatico}>
+        {/* CÂMARA TÁTIL COM FILTRO DE POLÍGONOS INTEGRADO */}
+        <div style={styles.cameraWrapper} onClick={confirmarComJoinha}>
           <Webcam ref={webcamRef} style={styles.videoStream} audio={false} videoConstraints={{ facingMode: "user" }} />
           <canvas ref={canvasRef} style={styles.canvasOverlay} />
         </div>
 
-        {/* INTERAÇÃO SECUNDÁRIA */}
+        {/* CONTROLADOR DE STATUS */}
         <div style={styles.actionContainer}>
           {indiceLetra === 4 && (
-            <button style={styles.actionButton} onClick={gerarNovaPalavra}>Nova Palavra</button>
+            <button onClick={gerarNovaPalavra} style={styles.btnNextWord}>Próxima Palavra</button>
           )}
         </div>
-      </div>  
+
+        {/* TABELA COMPLETA DO ALFABETO */}
+        <div style={styles.card}>
+          <h4 style={styles.tableTitle}>📋 Dicionário do Alfabeto (A a Z)</h4>
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
+                <tr style={styles.thRow}>
+                  <th style={styles.th}>Letra</th>
+                  <th style={styles.th}>Formato Gesto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TABELA_COMPLETA_ALFABETO.map((sinal, idx) => (
+                  <tr key={idx} style={idx % 2 === 0 ? styles.trEven : styles.trOdd}>
+                    <td style={styles.tdLetter}>{sinal.letra}</td>
+                    <td style={styles.tdDesc}>{sinal.gesto}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-const statusRedeText = (texto) => {
-  if (texto.includes("A inicializar")) return "🔄 " + texto;
-  if (texto.includes("descarregar")) return "⏳ " + texto;
-  if (texto.includes("pronto")) return "✅ " + texto;
-  if (texto.includes("bloqueada")) return "⚠️ " + texto;
-  return texto;
-};
-
 const styles = {
-  container: {
-    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
-    backgroundColor: "#f8fafc",
-    minHeight: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    padding: "20px"
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    marginBottom: "20px"
-  },
-  title: {
-    fontSize: "2.5rem",
-    color: "#1e293b",
-    marginRight: "15px"
-  },
-  badge: {
-    backgroundColor: "#3b82f6",
-    color: "white",
-    padding: "5px 10px",
-    borderRadius: "5px",
-    fontSize: "0.9rem"
-  },
-  statusTexto: {
-    fontSize: "1.2rem",
-    color: "#334155",
-    marginBottom: "30px"  
-  },  
-  mobileLayout: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    width: "100%",
-    maxWidth: "400px"
-  },
-  card: {
-    backgroundColor: "white",
-    padding: "20px",
-    borderRadius: "10px",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-    marginBottom: "30px",
-    width: "100%"
-  },
-  wordRow: {
-    display: "flex",
-    justifyContent: "space-around"
-  },
-  letterSlot: {
-    width: "60px",
-    height: "60px",
-    borderRadius: "8px",
-    borderWidth: "3px",
-    borderStyle: "solid",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "1.5rem",
-    fontWeight: "bold",
-    transition: "all 0.3s ease" 
-  },
-  cameraWrapper: {
-    position: "relative",
-    width: "100%",
-    maxWidth: "400px",
-    borderRadius: "10px",
-    overflow: "hidden",
-    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-    cursor: "pointer"
-  },
-  videoStream: {
-    width: "100%",
-    height: "auto",
-    transform: "scaleX(-1)" 
-  },
-  canvasOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    pointerEvents: "none"
-  },
-  actionContainer: {
-    marginTop: "20px"
-  },
-  actionButton: {
-    backgroundColor: "#3b82f6",
-    color: "white",
-    padding: "10px 20px",
-    borderRadius: "5px",
-    border: "none",
-    fontSize: "1rem",
-    cursor: "pointer",
-    transition: "background-color 0.3s ease"
-  }
+  container: { fontFamily: 'system-ui, sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh', padding: '12px', boxSizing: 'border-box' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
+  title: { fontSize: '1.2rem', color: '#0f172a', fontWeight: '800', margin: 0 },
+  badge: { backgroundColor: '#10b981', color: 'white', padding: '3px 10px', borderRadius: '12px', fontSize: '0.6rem', fontWeight: 'bold' },
+  mobileLayout: { display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '480px', margin: '0 auto' },
+  card: { backgroundColor: '#ffffff', borderRadius: '14px', padding: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' },
+  wordRow: { display: 'flex', justifyContent: 'center', gap: '8px' },
+  letterSlot: { width: '45px', height: '45px', borderRadius: '8px', border: '2px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 'bold', transition: 'all 0.2s ease' },
+  cameraWrapper: { position: 'relative', borderRadius: '14px', overflow: 'hidden', width: '100%', boxShadow: '0 4px 8px rgba(0,0,0,0.04)', cursor: 'pointer' },
+  videoStream: { width: '100%', display: 'block', transform: 'scaleX(-1)' },
+  canvasOverlay: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', transform: 'scaleX(-1)' },
+  actionContainer: { display: 'flex', justifyContent: 'center', marginTop: '10px' },
+  btnNextWord: { backgroundColor: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' },
+  tableTitle: { margin: '0 0 10px 0', color: '#0f172a', fontSize: '1rem', fontWeight: '600' },
+  tableWrapper: { maxHeight: '200px', overflowY: 'auto' },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  thRow: { backgroundColor: '#e2e8f0' },
+  th: { padding: '8px', textAlign: 'left', fontSize: '0.9rem', color: '#334155' },
+  trEven: { backgroundColor: '#f8fafc' },
+  trOdd: { backgroundColor: '#ffffff' },
+  tdLetter: { padding: '8px', fontSize: '1.2rem', fontWeight: 'bold', color: '#3b82f6' },
+  tdDesc: { padding: '8px', fontSize: '0.9rem', color: '#334155' }
 };
 
 export default App;
